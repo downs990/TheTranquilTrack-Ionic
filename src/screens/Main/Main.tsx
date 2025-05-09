@@ -16,7 +16,7 @@ export const Main = (): JSX.Element => {
                 <div className="text-white text-[32px] font-['Viga',Helvetica] font-normal mb-6">
                   The Tranquil Track
                 </div>
-                <div className="w-[126px] h-[33px] bg-[#e6fe58] rounded-lg flex items-center justify-center">
+                <div className="w-[126px] h-[33px] bg-[#e6fe58] rounded-lg flex items-center justify-center"> 
                   <span className="text-black text-2xl font-['Viga',Helvetica] font-normal">DO IT NOW</span>
                 </div>
               </div>
