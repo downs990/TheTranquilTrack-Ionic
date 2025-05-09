@@ -12,18 +12,17 @@ export const Profile = (): JSX.Element => {
 
   return (
     <div className="bg-[#141414] flex flex-row justify-center w-full">
-      <div className="bg-[#141414] w-[390px] h-[844px]">
-        <div className="relative h-[844px] bg-[url(/2.jpg)] bg-cover bg-[50%_50%]">
+      <div className="bg-[#141414] w-[390px] h-[754px]">
+        <div className="relative h-[754px] bg-[url(/2.jpg)] bg-cover bg-[50%_50%]">
           {/* Toggle Switch - aligned with left square */}
-          <div className="absolute top-6 left-6">
+          {/* <div className="absolute top-6 left-6">
             <Switch  />
-          </div>
+          </div> */}
 
           <div className="absolute bottom-28 left-0 right-0 px-6">
             {/* Progress Text */}
             <div className="mb-4 text-center">
-              <div className="text-white text-2xl font-semibold">Personal Records</div>
-              <div className="text-[#E6FE58] text-base">PR Goals</div>
+              <div className="text-white text-2xl font-semibold">Personal Records</div> 
             </div>
 
             {/* Username Section */}

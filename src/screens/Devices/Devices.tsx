@@ -52,8 +52,8 @@ export const Devices = (): JSX.Element => {
 
   return (
     <div className="bg-[#141414] flex flex-row justify-center w-full">
-      <div className="bg-[#141414] w-[390px] h-[844px]">
-        <div className="relative h-[844px] bg-[url(/edgar-chaparro-shfo3woggtu-unsplash-1.png)] bg-cover bg-[50%_50%]">
+      <div className="bg-[#141414] w-[390px] h-[754px]">
+        <div className="relative h-[754px] bg-[url(/edgar-chaparro-shfo3woggtu-unsplash-1.png)] bg-cover bg-[50%_50%]">
           {/* Header */}
           <div className="absolute top-0 left-0 right-0 bg-black/50 backdrop-blur-lg p-4">
             <div className="flex items-center">
