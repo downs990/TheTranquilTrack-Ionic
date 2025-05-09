@@ -5,7 +5,7 @@ import { Card, CardContent } from "../../components/ui/card";
 
 export const Main = (): JSX.Element => {
   const navigate = useNavigate();
-
+ 
   return (
     <div className="bg-[#141414] flex flex-row justify-center w-full">
       <div className="bg-[#141414] w-[390px] h-[754px]">
