@@ -6,6 +6,7 @@ import { SignUp } from "./screens/SignUp";
 import { Profile } from "./screens/Profile";
 import { Devices } from "./screens/Devices";
 import { WorkoutRecords } from "./screens/WorkoutRecords";
+import { AddExerciseType } from "./screens/AddExerciseType";
 
 createRoot(document.getElementById("app") as HTMLElement).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById("app") as HTMLElement).render(
         <Route path="/profile" element={<Profile />} />
         <Route path="/devices" element={<Devices />} />
         <Route path="/workout-records" element={<WorkoutRecords />} />
+        <Route path="/add-exercise" element={<AddExerciseType />} />
         
       </Routes>
     </BrowserRouter>

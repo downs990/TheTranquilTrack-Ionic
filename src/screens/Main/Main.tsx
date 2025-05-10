@@ -24,8 +24,8 @@ export const Main = (): JSX.Element => {
           </Card> 
 
           <div className="absolute top-[200px] left-[42px] font-['Segoe_UI-Regular',Helvetica] font-normal text-white text-sm tracking-[0] leading-normal">
-            Achieve your fitness goals with our expert <br />
-            trainers! Join us for personalized workouts <br />
+            Achieve your fitness goals with our virtual <br />
+            AI trainer! Join us for personalized workouts <br />
             that get results
           </div>
 
