@@ -9,7 +9,7 @@ export const SignUp = (): JSX.Element => {
   return (
     <div className="bg-[#141414] flex flex-row justify-center w-full">
       <div className="bg-[#141414] w-[390px] h-[754px]">
-        <div className="relative h-[754px] bg-[url(/edgar-chaparro-shfo3woggtu-unsplash-1.png)] bg-cover bg-[50%_50%]">
+        <div className="relative h-[754px] bg-[url(/5.png)] bg-cover bg-[50%_50%]">
           <Card className="absolute w-[310px] top-[200px] left-[39px] border-none bg-[#ffffff1a] backdrop-blur-md p-6 rounded-xl">
             <CardContent className="p-0">
               <h2 className="text-white text-2xl font-['Viga',Helvetica] mb-6">Sign In</h2>
