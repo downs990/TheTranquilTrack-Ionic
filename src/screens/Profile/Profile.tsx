@@ -18,8 +18,8 @@ export const Profile = (): JSX.Element => {
 
   return (
     <div className="bg-[#141414] flex flex-row justify-center w-full">
-      <div className="bg-[#141414] w-[390px] h-[754px]">
-        <div className="relative h-[754px] bg-[url(/2.jpg)] bg-cover bg-[50%_50%]">
+      <div className="bg-[#141414] w-[390px] h-[100vh]">
+        <div className="relative h-[100vh] bg-[url(/2.jpg)] bg-cover bg-[50%_50%]">
           <div className="absolute bottom-28 left-0 right-0 px-6">
             
 

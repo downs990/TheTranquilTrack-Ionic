@@ -20,8 +20,9 @@ export const AddExerciseType = (): JSX.Element => {
 
   return (
     <div className="bg-[#141414] flex flex-row justify-center w-full">
-      <div className="bg-[#141414] w-[390px] h-[844px]">
-        <div className="relative h-[844px] bg-[url(/5.png)] bg-cover bg-[50%_50%]">
+      <div className="bg-[#141414] w-[390px] h-[100vh]">
+        <div className="relative h-[100vh] bg-[url(/5.png)] bg-cover bg-[50%_50%]">
+        
           <div className="absolute top-0 left-0 right-0 bg-black/50 backdrop-blur-lg p-4">
             <div className="flex items-center">
               <Button
@@ -35,7 +36,12 @@ export const AddExerciseType = (): JSX.Element => {
             </div>
           </div>
 
-          <div className="absolute inset-0 flex items-center justify-center">
+
+          {/* TODO: Figure out how to make this div a smaller height. It's trying to take up the whole screen.
+                    - you can see it's size by giving it a background property   bg-[url(/5.png)]
+                    ------------------------------------------------------------------------------------------
+          */}
+          <div className="absolute inset-0 flex items-center justify-center mt-20">
             <AnimatePresence>
               {countdown > 0 ? (
                 <motion.div
@@ -59,6 +65,9 @@ export const AddExerciseType = (): JSX.Element => {
               )}
             </AnimatePresence>
           </div>
+              {/*----------------------------------------------------------------------------------------- */}
+
+
         </div>
       </div>
     </div>
