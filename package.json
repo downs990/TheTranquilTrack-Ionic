@@ -14,18 +14,18 @@
     "@capacitor/android": "^5.7.0",
     "@capacitor/core": "^5.7.0",
     "@capacitor/ios": "^5.7.0",
-    "clsx": "2.1.1",
-    "lucide-react": "^0.453.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.8.1",
-    "tailwind-merge": "2.5.4",
     "@radix-ui/react-aspect-ratio": "^1.1.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-switch": "^1.0.3",
-    "react-circular-progressbar": "^2.1.0",
     "class-variance-authority": "^0.7.0",
-    "framer-motion": "^11.0.3"
+    "clsx": "2.1.1",
+    "framer-motion": "^11.0.3",
+    "lucide-react": "^0.453.0",
+    "react": "^18.2.0",
+    "react-circular-progressbar": "^2.1.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.1",
+    "tailwind-merge": "2.5.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^5.7.0",
@@ -37,6 +37,7 @@
     "globals": "15.12.0",
     "postcss": "^8.4.35",
     "tailwindcss": "3.4.16",
+    "typescript": "^5.8.3",
     "vite": "6.0.4"
   },
   "alias": {
