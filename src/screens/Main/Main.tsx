@@ -29,7 +29,7 @@ export const Main = (): JSX.Element => {
             that get results
           </div>
 
-          <div className="absolute w-[309px] h-[59px] top-[530px] left-[39px] bg-[#d9d9d926] rounded-[23px] flex items-center justify-between px-[15px]">
+          <div className="absolute w-[309px] h-[59px] bottom-[10%] left-[39px] bg-[#d9d9d926] rounded-[23px] flex items-center justify-between px-[15px]">
             <Button
               variant="ghost"
               className="w-[131px] h-[41px] bg-[#d9d9d926] rounded-[23px] text-white font-['Segoe_UI-Regular',Helvetica] text-[15px] hover:bg-[#d9d9d940]"
