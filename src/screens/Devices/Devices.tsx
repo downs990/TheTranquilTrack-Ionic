@@ -1,17 +1,8 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Watch, Footprints, Wifi, Battery, Bluetooth, X, RefreshCw } from 'lucide-react';
-import { Button } from "../../components/ui/button";
+import { ArrowLeft, Bluetooth, X, RefreshCw, Trash2 } from 'lucide-react';
 import { BleClient, ScanResult } from "@capacitor-community/bluetooth-le";
-
-interface Device {
-  id: string;
-  name: string;
-  type: 'ankle' | 'wrist';
-  battery: number;
-  status: 'connected' | 'disconnected';
-  lastSync: string;
-}
+import { useDevices } from "../../lib/DeviceContext";
 
 interface ScannedDevice {
   deviceId: string;
@@ -21,101 +12,42 @@ interface ScannedDevice {
 
 export const Devices = (): JSX.Element => {
   const navigate = useNavigate();
+  const { pairedDevices, setPairedDevices } = useDevices();
   const [showScanner, setShowScanner] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scannedDevices, setScannedDevices] = useState<ScannedDevice[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
-
-  const connectedDevices: Device[] = [
-    {
-      id: '1',
-      name: 'Left Ankle Tracker',
-      type: 'ankle',
-      battery: 85,
-      status: 'connected',
-      lastSync: '2 min ago'
-    },
-    {
-      id: '2',
-      name: 'Right Ankle Tracker',
-      type: 'ankle',
-      battery: 72,
-      status: 'disconnected',
-      lastSync: '1 hour ago'
-    },
-    {
-      id: '3',
-      name: 'Left Wristband',
-      type: 'wrist',
-      battery: 95,
-      status: 'connected',
-      lastSync: 'Just now'
-    },
-    {
-      id: '4',
-      name: 'Right Wristband',
-      type: 'wrist',
-      battery: 45,
-      status: 'disconnected',
-      lastSync: '2 days ago'
-    }
-  ];
+  const [adding, setAdding] = useState<string | null>(null);
 
   const startScan = useCallback(async () => {
     setScannedDevices([]);
     setScanError(null);
     setScanning(true);
-
     try {
       await BleClient.initialize({ androidNeverForLocation: false });
-
       const seen = new Set<string>();
-
       await BleClient.requestLEScan({}, (result: ScanResult) => {
         const name = result.localName ?? result.device?.name ?? null;
-        if (!name) return;
-        if (seen.has(result.device.deviceId)) return;
+        if (!name || seen.has(result.device.deviceId)) return;
         seen.add(result.device.deviceId);
-
-        setScannedDevices(prev => [
-          ...prev,
-          {
-            deviceId: result.device.deviceId,
-            name,
-            rssi: result.rssi ?? 0,
-          }
-        ]);
+        setScannedDevices(prev => [...prev, { deviceId: result.device.deviceId, name, rssi: result.rssi ?? 0 }]);
       });
-
-      // Stop scan after 10 seconds
       setTimeout(async () => {
-        try {
-          await BleClient.stopLEScan();
-        } catch (_) {
-          // ignore
-        }
+        try { await BleClient.stopLEScan(); } catch (_) {}
         setScanning(false);
       }, 10000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setScanError(msg);
+      setScanError(err instanceof Error ? err.message : String(err));
       setScanning(false);
     }
   }, []);
 
   const stopScan = useCallback(async () => {
-    try {
-      await BleClient.stopLEScan();
-    } catch (_) {
-      // ignore
-    }
+    try { await BleClient.stopLEScan(); } catch (_) {}
     setScanning(false);
   }, []);
 
-  const openScanner = () => {
-    setShowScanner(true);
-    startScan();
-  };
+  const openScanner = () => { setShowScanner(true); startScan(); };
 
   const closeScanner = async () => {
     await stopScan();
@@ -124,201 +56,213 @@ export const Devices = (): JSX.Element => {
     setScanError(null);
   };
 
-  const signalStrength = (rssi: number) => {
-    if (rssi >= -60) return 'Excellent';
-    if (rssi >= -75) return 'Good';
-    if (rssi >= -85) return 'Fair';
-    return 'Weak';
+  const addDevice = async (device: ScannedDevice) => {
+    if (pairedDevices.some(p => p.deviceId === device.deviceId)) return;
+    setAdding(device.deviceId);
+    setPairedDevices(prev => [...prev, { deviceId: device.deviceId, name: device.name }]);
+    setAdding(null);
+    await closeScanner();
   };
 
-  const signalColor = (rssi: number) => {
-    if (rssi >= -60) return 'text-[#E6FE58]';
-    if (rssi >= -75) return 'text-green-400';
-    if (rssi >= -85) return 'text-yellow-400';
-    return 'text-red-400';
+  const removeDevice = (deviceId: string) => setPairedDevices(prev => prev.filter(d => d.deviceId !== deviceId));
+
+  const signalInfo = (rssi: number) => {
+    if (rssi >= -60) return { text: "Excellent", color: "#059669" };
+    if (rssi >= -70) return { text: "Good", color: "#0077A8" };
+    if (rssi >= -80) return { text: "Fair", color: "#D97706" };
+    return { text: "Weak", color: "#DC2626" };
   };
 
   return (
-    <div className="bg-[#141414] flex flex-row justify-center w-full">
-      <div className="bg-[#141414] w-[390px] h-[100vh]">
-        <div className="relative h-[100vh] bg-[url(/2.jpg)] bg-cover bg-[50%_50%]">
+    <div className="flex justify-center w-full" style={{ background: "#F0F4F8" }}>
+      <div className="w-[390px] h-[100vh] relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
 
-          {/* Header */}
-          <div className="absolute top-0 left-0 right-0 bg-black/50 backdrop-blur-lg p-4 z-10">
-            <div className="flex items-center">
-              <Button
-                variant="ghost"
-                className="p-2 text-white hover:text-[#E6FE58]"
-                onClick={() => navigate('/profile')}
-              >
-                <ArrowLeft className="w-6 h-6" />
-              </Button>
-              <h1 className="text-white text-xl font-semibold ml-4">Connected Devices</h1>
+        {/* Header */}
+        <div className="shrink-0 px-5 pt-12 pb-5" style={{ background: "linear-gradient(135deg, #0077A8 0%, #00B4D8 100%)" }}>
+          <div className="flex items-center gap-3">
+            <button
+              className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95"
+              style={{ background: "rgba(255,255,255,0.2)" }}
+              onClick={() => navigate('/profile')}
+            >
+              <ArrowLeft className="w-5 h-5 text-white" />
+            </button>
+            <div>
+              <p className="text-white/60 text-xs uppercase tracking-widest">Manage</p>
+              <p className="text-white font-black text-xl leading-tight">Devices</p>
             </div>
           </div>
+        </div>
 
-          {/* Device List */}
-          <div className="absolute top-20 left-0 right-0 bottom-0 px-6 overflow-y-auto">
-            <Button
-              className="w-full mb-6 bg-[#E6FE58] text-black hover:bg-[#d9e64d] flex items-center gap-2"
-              onClick={openScanner}
-            >
-              <Bluetooth className="w-4 h-4" />
-              Add New Device
-            </Button>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 pt-5 pb-8">
 
-            <div className="space-y-4 pb-8">
-              {connectedDevices.map(device => (
+          <button
+            className="w-full mb-5 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold text-white transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #0077A8 0%, #00B4D8 100%)", boxShadow: "0 4px 16px rgba(0,119,168,0.3)" }}
+            onClick={openScanner}
+          >
+            <Bluetooth className="w-4 h-4" />
+            Scan for Devices
+          </button>
+
+          {pairedDevices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "white", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                <Bluetooth className="w-7 h-7" style={{ color: "#C0C7D4" }} />
+              </div>
+              <p className="font-bold" style={{ color: "#1A1A2E" }}>No paired devices</p>
+              <p className="text-sm mt-1" style={{ color: "#9BA3B2" }}>Tap "Scan for Devices" to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pairedDevices.map(device => (
                 <div
-                  key={device.id}
-                  className="bg-black/40 backdrop-blur-md rounded-2xl p-4"
+                  key={device.deviceId}
+                  className="rounded-2xl px-4 py-4 flex items-center gap-3"
+                  style={{ background: "white", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      {device.type === 'ankle' ? (
-                        <Footprints className="w-6 h-6 text-[#E6FE58]" />
-                      ) : (
-                        <Watch className="w-6 h-6 text-[#E6FE58]" />
-                      )}
-                      <div>
-                        <h3 className="text-white font-semibold">{device.name}</h3>
-                        <p className="text-gray-400 text-sm">Last sync: {device.lastSync}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Battery className={`w-5 h-5 ${device.battery > 20 ? 'text-[#E6FE58]' : 'text-red-500'}`} />
-                      <span className="text-sm text-gray-400">{device.battery}%</span>
-                    </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#E8F7FB" }}>
+                    <Bluetooth className="w-5 h-5" style={{ color: "#0077A8" }} />
                   </div>
-                  <div className="flex items-center justify-between mt-3">
-                    <div className="flex items-center gap-2">
-                      <Wifi className={`w-4 h-4 ${device.status === 'connected' ? 'text-[#E6FE58]' : 'text-gray-500'}`} />
-                      <span className={`text-sm ${device.status === 'connected' ? 'text-[#E6FE58]' : 'text-gray-500'}`}>
-                        {device.status === 'connected' ? 'Connected' : 'Disconnected'}
-                      </span>
-                    </div>
-                    <Button
-                      variant={device.status === 'connected' ? 'destructive' : 'outline'}
-                      className={device.status === 'connected' ? 'bg-gray-500/20 hover:bg-gray-500/30' : 'bg-[#E6FE58] text-black hover:bg-[#d9e64d]'}
-                      onClick={() => {}}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate" style={{ color: "#1A1A2E" }}>{device.name}</p>
+                    <p className="text-xs mt-0.5 truncate" style={{ color: "#C0C7D4" }}>{device.deviceId}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-bold" style={{ color: "#059669" }}>Paired</span>
+                    <button
+                      onClick={() => removeDevice(device.deviceId)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ background: "#FFF0EE" }}
                     >
-                      {device.status === 'connected' ? 'Disconnect' : 'Connect'}
-                    </Button>
+                      <Trash2 className="w-4 h-4 text-red-400" />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* BLE Scanner Modal */}
-          {showScanner && (
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-20 flex flex-col">
-              <div className="bg-[#1a1a1a] rounded-t-3xl mt-auto max-h-[75vh] flex flex-col">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <Bluetooth className="w-5 h-5 text-[#E6FE58]" />
-                    <h2 className="text-white text-lg font-semibold">Nearby Devices</h2>
-                  </div>
-                  <button
-                    onClick={closeScanner}
-                    className="text-gray-400 hover:text-white transition-colors p-1"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+        {/* Scanner sheet */}
+        {showScanner && (
+          <div className="absolute inset-0 z-20 flex flex-col" style={{ background: "rgba(15,25,40,0.5)", backdropFilter: "blur(6px)" }}>
+            <div className="mt-auto flex flex-col max-h-[78vh] rounded-t-3xl" style={{ background: "white" }}>
+
+              <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid #EDF0F5" }}>
+                <div className="flex items-center gap-2">
+                  <Bluetooth className="w-5 h-5" style={{ color: "#0077A8" }} />
+                  <span className="font-black" style={{ color: "#1A1A2E" }}>Nearby Devices</span>
                 </div>
+                <button onClick={closeScanner} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#F0F4F8" }}>
+                  <X className="w-4 h-4" style={{ color: "#9BA3B2" }} />
+                </button>
+              </div>
 
-                {/* Scan status bar */}
-                <div className="px-6 py-3 flex items-center justify-between border-b border-white/5">
-                  <div className="flex items-center gap-2">
+              <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #F5F7FA" }}>
+                <div className="flex items-center gap-2">
+                  {scanning ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#00B4D8" }} />
+                      <span className="text-sm" style={{ color: "#9BA3B2" }}>Scanning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full" style={{ background: "#C0C7D4" }} />
+                      <span className="text-sm" style={{ color: "#9BA3B2" }}>
+                        {scannedDevices.length > 0 ? `${scannedDevices.length} found` : "Scan complete"}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {!scanning && (
+                  <button onClick={startScan} className="flex items-center gap-1.5 text-sm font-bold" style={{ color: "#0077A8" }}>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Rescan
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+                {scanError && (
+                  <div className="rounded-xl px-4 py-3" style={{ background: "#FFF0EE", border: "1px solid #FFCDC7" }}>
+                    <p className="text-sm text-red-600">{scanError}</p>
+                    <p className="text-xs mt-1 text-red-400">Make sure Bluetooth is on and permissions are granted.</p>
+                  </div>
+                )}
+
+                {!scanError && scannedDevices.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
                     {scanning ? (
                       <>
-                        <span className="w-2 h-2 rounded-full bg-[#E6FE58] animate-pulse" />
-                        <span className="text-sm text-gray-400">Scanning...</span>
+                        <div className="w-10 h-10 rounded-full border-2 animate-spin mb-3" style={{ borderColor: "rgba(0,180,216,0.2)", borderTopColor: "#00B4D8" }} />
+                        <p className="text-sm" style={{ color: "#9BA3B2" }}>Looking for BLE devices...</p>
                       </>
                     ) : (
                       <>
-                        <span className="w-2 h-2 rounded-full bg-gray-500" />
-                        <span className="text-sm text-gray-400">
-                          {scannedDevices.length > 0 ? `${scannedDevices.length} device${scannedDevices.length !== 1 ? 's' : ''} found` : 'Scan complete'}
-                        </span>
+                        <Bluetooth className="w-9 h-9 mb-3" style={{ color: "#C0C7D4" }} />
+                        <p className="text-sm" style={{ color: "#9BA3B2" }}>No devices found</p>
+                        <p className="text-xs mt-1" style={{ color: "#C0C7D4" }}>Put your device in pairing mode</p>
                       </>
                     )}
                   </div>
-                  {!scanning && (
-                    <button
-                      onClick={startScan}
-                      className="flex items-center gap-1.5 text-sm text-[#E6FE58] hover:text-[#d9e64d] transition-colors"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      Rescan
-                    </button>
-                  )}
-                </div>
+                )}
 
-                {/* Device list */}
-                <div className="flex-1 overflow-y-auto px-6 py-3 space-y-2">
-                  {scanError && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
-                      <p className="text-red-400 text-sm">{scanError}</p>
-                      <p className="text-gray-500 text-xs mt-1">Make sure Bluetooth is enabled and permissions are granted.</p>
-                    </div>
-                  )}
+                {scannedDevices.map(device => {
+                  const paired = pairedDevices.some(p => p.deviceId === device.deviceId);
+                  const isAdding = adding === device.deviceId;
+                  const sig = signalInfo(device.rssi);
 
-                  {!scanError && scannedDevices.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      {scanning ? (
-                        <>
-                          <div className="w-12 h-12 rounded-full border-2 border-[#E6FE58]/30 border-t-[#E6FE58] animate-spin mb-4" />
-                          <p className="text-gray-400 text-sm">Looking for nearby BLE devices...</p>
-                        </>
-                      ) : (
-                        <>
-                          <Bluetooth className="w-10 h-10 text-gray-600 mb-3" />
-                          <p className="text-gray-400 text-sm">No devices found</p>
-                          <p className="text-gray-600 text-xs mt-1">Make sure your device is in pairing mode</p>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {scannedDevices.map(device => (
+                  return (
                     <button
                       key={device.deviceId}
-                      className="w-full bg-white/5 hover:bg-white/10 active:bg-white/15 transition-colors rounded-xl px-4 py-3 flex items-center justify-between text-left"
-                      onClick={() => {}}
+                      disabled={paired || isAdding}
+                      onClick={() => addDevice(device)}
+                      className="w-full rounded-xl px-4 py-3 flex items-center gap-3 text-left transition-all active:scale-98"
+                      style={{
+                        background: paired ? "#E8F7FB" : "#F8FAFC",
+                        border: `1px solid ${paired ? "#B3E5F0" : "#EDF0F5"}`
+                      }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#E6FE58]/10 flex items-center justify-center">
-                          <Bluetooth className="w-4 h-4 text-[#E6FE58]" />
-                        </div>
-                        <div>
-                          <p className="text-white text-sm font-medium leading-tight">{device.name}</p>
-                          <p className="text-gray-500 text-xs mt-0.5">{device.deviceId}</p>
-                        </div>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#E8F7FB" }}>
+                        {isAdding ? (
+                          <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(0,119,168,0.2)", borderTopColor: "#0077A8" }} />
+                        ) : (
+                          <Bluetooth className="w-4 h-4" style={{ color: "#0077A8" }} />
+                        )}
                       </div>
-                      <div className="text-right">
-                        <p className={`text-xs font-medium ${signalColor(device.rssi)}`}>
-                          {signalStrength(device.rssi)}
-                        </p>
-                        <p className="text-gray-600 text-xs">{device.rssi} dBm</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate" style={{ color: "#1A1A2E" }}>{device.name}</p>
+                        <p className="text-xs truncate" style={{ color: "#C0C7D4" }}>{device.deviceId}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {paired ? (
+                          <p className="text-xs font-bold" style={{ color: "#059669" }}>Added</p>
+                        ) : (
+                          <>
+                            <p className="text-xs font-bold" style={{ color: sig.color }}>{sig.text}</p>
+                            <p className="text-xs" style={{ color: "#C0C7D4" }}>{device.rssi} dBm</p>
+                          </>
+                        )}
                       </div>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
+              </div>
 
-                <div className="px-6 py-4">
-                  <Button
-                    className="w-full bg-white/10 text-white hover:bg-white/20"
-                    onClick={closeScanner}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+              <div className="px-5 py-4" style={{ borderTop: "1px solid #EDF0F5" }}>
+                <button
+                  className="w-full rounded-xl py-3 font-bold transition-all active:scale-95"
+                  style={{ background: "#F0F4F8", color: "#9BA3B2" }}
+                  onClick={closeScanner}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
