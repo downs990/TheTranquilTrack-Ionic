@@ -1,113 +1,158 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle } from 'lucide-react';
+import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { BleClient } from "@capacitor-community/bluetooth-le";
 import { useDevices } from "../../lib/DeviceContext";
+import { loadRecordings, saveRecording } from "../../lib/recordingsStore";
+import { saveCsv } from "../../lib/utils";
+import type { DataPoint, Recording } from "../../lib/types";
 
 const SERVICE_UUID = "0000181a-0000-1000-8000-00805f9b34fb";
 const CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
 const MAX_POINTS = 80;
 
-interface DataPoint { x: number; y: number; z: number; }
+// ─── Reusable graph renderer ────────────────────────────────────────────────
+
+function drawGraph(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  data: DataPoint[],
+  maxPoints: number,
+) {
+  const PAD = { top: 14, bottom: 22, left: 8, right: 8 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (data.length < 2) {
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No data", W / 2, H / 2);
+    return;
+  }
+
+  const allVals = data.flatMap(d => [d.x, d.y, d.z]);
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const range = maxV - minV || 1;
+
+  const toY = (v: number) => PAD.top + plotH - ((v - minV) / range) * plotH;
+  const toX = (i: number, total: number) =>
+    PAD.left + (i / (Math.max(total, 2) - 1)) * plotW;
+
+  ctx.strokeStyle = "rgba(0,0,0,0.06)";
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const y = PAD.top + (g / 4) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, y);
+    ctx.lineTo(W - PAD.right, y);
+    ctx.stroke();
+  }
+
+  const series: { key: keyof DataPoint; color: string; label: string }[] = [
+    { key: "x", color: "#00B4D8", label: "X" },
+    { key: "y", color: "#06D6A0", label: "Y" },
+    { key: "z", color: "#F77F00", label: "Z" },
+  ];
+
+  const isLive = data.length < maxPoints;
+  const offset = isLive ? maxPoints - data.length : 0;
+  const total = isLive ? maxPoints : data.length;
+
+  series.forEach(({ key, color }) => {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    data.forEach((d, i) => {
+      const px = toX(i + offset, total);
+      const py = toY(d[key] as number);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+  });
+
+  series.forEach(({ color, label, key }, i) => {
+    const last = data[data.length - 1];
+    const val = last ? (last[key] as number).toFixed(2) : "--";
+    const lx = PAD.left + i * 90;
+    const ly = H - 4;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(lx + 5, ly - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`${label}: ${val}`, lx + 13, ly - 1);
+  });
+}
 
 function LiveGraph({ data }: { data: DataPoint[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const W = canvas.width;
-    const H = canvas.height;
-    const PAD = { top: 14, bottom: 22, left: 8, right: 8 };
-    const plotW = W - PAD.left - PAD.right;
-    const plotH = H - PAD.top - PAD.bottom;
-
-    ctx.clearRect(0, 0, W, H);
-
-    if (data.length < 2) {
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Waiting for data...", W / 2, H / 2);
-      return;
-    }
-
-    const allVals = data.flatMap(d => [d.x, d.y, d.z]);
-    const minV = Math.min(...allVals);
-    const maxV = Math.max(...allVals);
-    const range = maxV - minV || 1;
-
-    const toY = (v: number) => PAD.top + plotH - ((v - minV) / range) * plotH;
-    const toX = (i: number) => PAD.left + (i / (MAX_POINTS - 1)) * plotW;
-
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
-    ctx.lineWidth = 1;
-    for (let g = 0; g <= 4; g++) {
-      const y = PAD.top + (g / 4) * plotH;
-      ctx.beginPath();
-      ctx.moveTo(PAD.left, y);
-      ctx.lineTo(W - PAD.right, y);
-      ctx.stroke();
-    }
-
-    const series: { key: keyof DataPoint; color: string; label: string }[] = [
-      { key: "x", color: "#00B4D8", label: "X" },
-      { key: "y", color: "#06D6A0", label: "Y" },
-      { key: "z", color: "#F77F00", label: "Z" },
-    ];
-
-    const offset = MAX_POINTS - data.length;
-
-    series.forEach(({ key, color }) => {
-      ctx.beginPath();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.lineJoin = "round";
-      data.forEach((d, i) => {
-        const px = toX(i + offset);
-        const py = toY(d[key] as number);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      ctx.stroke();
-    });
-
-    series.forEach(({ color, label, key }, i) => {
-      const last = data[data.length - 1];
-      const val = last ? (last[key] as number).toFixed(2) : "--";
-      const lx = PAD.left + i * 90;
-      const ly = H - 4;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(lx + 5, ly - 5, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(0,0,0,0.5)";
-      ctx.font = "10px sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(`${label}: ${val}`, lx + 13, ly - 1);
-    });
+    drawGraph(ctx, canvas.width, canvas.height, data, MAX_POINTS);
   }, [data]);
-
-  return (
-    <canvas ref={canvasRef} width={318} height={160} className="w-full rounded-xl" />
-  );
+  return <canvas ref={canvasRef} width={318} height={160} className="w-full rounded-xl" />;
 }
+
+function RecordingGraph({ data }: { data: DataPoint[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    drawGraph(ctx, canvas.width, canvas.height, data, data.length);
+  }, [data]);
+  return <canvas ref={canvasRef} width={318} height={160} className="w-full rounded-xl" />;
+}
+
+// ─── CSV helpers ─────────────────────────────────────────────────────────────
+
+function downloadCsv(recording: Recording) {
+  const header = "timestamp_ms,x,y,z\n";
+  const rows = recording.data
+    .map((d, i) => `${i * 50},${d.x},${d.y},${d.z}`)
+    .join("\n");
+  const filename = `${recording.name.replace(/\s+/g, "_")}.csv`;
+  saveCsv(filename, header + rows);
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export const Profile = (): JSX.Element => {
   const navigate = useNavigate();
   const { pairedDevices } = useDevices();
+
   const [isWorkoutActive, setIsWorkoutActive] = useState(false);
   const [graphData, setGraphData] = useState<DataPoint[]>([]);
   const [bleStatus, setBleStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
   const [bleError, setBleError] = useState<string | null>(null);
   const connectedDeviceId = useRef<string | null>(null);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
+  const recordingBuffer = useRef<DataPoint[]>([]);
+  const [recordings, setRecordings] = useState<Recording[]>(() => loadRecordings());
+  const [recordingsLoading] = useState(false);
+  const [viewingRecording, setViewingRecording] = useState<Recording | null>(null);
+
   const stopWorkout = useCallback(async () => {
     setIsWorkoutActive(false);
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    recordingBuffer.current = [];
     setBleStatus("idle");
     setBleError(null);
     if (connectedDeviceId.current) {
@@ -136,6 +181,9 @@ export const Profile = (): JSX.Element => {
       await BleClient.connect(device.deviceId, () => {
         setBleStatus("idle");
         setIsWorkoutActive(false);
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        recordingBuffer.current = [];
         connectedDeviceId.current = null;
       });
       connectedDeviceId.current = device.deviceId;
@@ -151,8 +199,15 @@ export const Profile = (): JSX.Element => {
           if (parts.length < 3) return;
           const [x, y, z] = parts.map(Number);
           if ([x, y, z].some(isNaN)) return;
+
+          const point: DataPoint = { x, y, z };
+
+          if (isRecordingRef.current) {
+            recordingBuffer.current.push(point);
+          }
+
           setGraphData(prev => {
-            const next = [...prev, { x, y, z }];
+            const next = [...prev, point];
             return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
           });
         }
@@ -169,6 +224,37 @@ export const Profile = (): JSX.Element => {
     if (isWorkoutActive) stopWorkout();
     else startWorkout();
   };
+
+  const startRecording = () => {
+    recordingBuffer.current = [];
+    isRecordingRef.current = true;
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    const data = [...recordingBuffer.current];
+    recordingBuffer.current = [];
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    if (data.length < 2) return;
+    const now = new Date();
+    const rec: Recording = {
+      id: crypto.randomUUID(),
+      name: `Recording ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+      timestamp: now.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      data,
+    };
+    saveRecording(rec);
+    setRecordings(prev => [rec, ...prev]);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (connectedDeviceId.current) {
+        BleClient.disconnect(connectedDeviceId.current).catch(() => {});
+      }
+    };
+  }, []);
 
   const sessions = [
     {
@@ -295,14 +381,6 @@ export const Profile = (): JSX.Element => {
     },
   ];
 
-  useEffect(() => {
-    return () => {
-      if (connectedDeviceId.current) {
-        BleClient.disconnect(connectedDeviceId.current).catch(() => {});
-      }
-    };
-  }, []);
-
   return (
     <div className="flex justify-center w-full" style={{ background: "#F0F4F8" }}>
       <div className="w-[390px] h-[100vh] relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
@@ -319,7 +397,6 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
 
-          {/* Action row inside header */}
           <div className="flex gap-3 mt-5">
             <button
               onClick={() => navigate('/add-exercise')}
@@ -333,10 +410,7 @@ export const Profile = (): JSX.Element => {
             <button
               onClick={toggleWorkout}
               className="flex-1 rounded-2xl py-3 flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={isWorkoutActive
-                ? { background: "rgba(255,255,255,0.95)", border: "1px solid rgba(255,255,255,0.3)" }
-                : { background: "rgba(255,255,255,0.95)", border: "1px solid rgba(255,255,255,0.3)" }
-              }
+              style={{ background: "rgba(255,255,255,0.95)", border: "1px solid rgba(255,255,255,0.3)" }}
             >
               {bleStatus === "connecting" ? (
                 <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(0,119,168,0.2)", borderTopColor: "#0077A8" }} />
@@ -355,7 +429,6 @@ export const Profile = (): JSX.Element => {
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 pt-4 pb-4">
 
-          {/* BLE error */}
           {bleError && (
             <div className="mb-4 rounded-2xl px-4 py-3 flex items-start gap-2" style={{ background: "#FFF0EE", border: "1px solid #FFCDC7" }}>
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-500" />
@@ -372,7 +445,8 @@ export const Profile = (): JSX.Element => {
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.22 }}
               >
-                <div className="rounded-2xl p-4 mb-4" style={{ background: "white", boxShadow: "0 2px 16px rgba(0,0,0,0.07)" }}>
+                {/* Live graph card */}
+                <div className="rounded-2xl p-4 mb-3" style={{ background: "white", boxShadow: "0 2px 16px rgba(0,0,0,0.07)" }}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Bluetooth className="w-4 h-4" style={{ color: "#00B4D8" }} />
@@ -414,6 +488,47 @@ export const Profile = (): JSX.Element => {
                     );
                   })()}
                 </div>
+
+                {/* Record button */}
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={bleStatus !== "connected"}
+                  className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2.5 font-bold transition-all active:scale-95 disabled:opacity-40"
+                  style={isRecording
+                    ? { background: "#FFF0EE", border: "1.5px solid #FFCDC7", color: "#DC2626" }
+                    : { background: "white", border: "1.5px solid #EDF0F5", color: "#1A1A2E", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }
+                  }
+                >
+                  {isRecording ? (
+                    <>
+                      <span className="w-3 h-3 rounded-sm bg-red-500 animate-pulse" />
+                      <span>Stop Recording</span>
+                      <span className="text-xs font-normal text-red-400 ml-1">({recordingBuffer.current.length} pts)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Circle className="w-4 h-4 fill-red-500 text-red-500" />
+                      <span>Start Recording</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Past recordings (shown while workout is active too) */}
+                {recordings.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: "#9BA3B2" }}>Recordings</p>
+                    <div className="space-y-2">
+                      {recordings.map(rec => (
+                        <RecordingRow
+                          key={rec.id}
+                          rec={rec}
+                          onView={() => setViewingRecording(rec)}
+                          onDownload={() => downloadCsv(rec)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div
@@ -423,6 +538,35 @@ export const Profile = (): JSX.Element => {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.22 }}
               >
+                {/* Past recordings section (visible in idle state) */}
+                {recordingsLoading ? (
+                  <div className="mb-5">
+                    <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: "#9BA3B2" }}>Recordings</p>
+                    <div className="space-y-2">
+                      {[0, 1].map(i => (
+                        <div key={i} className="rounded-xl px-4 py-3 h-14 animate-pulse" style={{ background: "white" }} />
+                      ))}
+                    </div>
+                  </div>
+                ) : recordings.length > 0 ? (
+                  <div className="mb-5">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#9BA3B2" }}>Recordings</p>
+                      <button onClick={() => navigate('/recordings')} className="text-xs font-bold" style={{ color: "#00B4D8" }}>See all</button>
+                    </div>
+                    <div className="space-y-2">
+                      {recordings.slice(0, 3).map(rec => (
+                        <RecordingRow
+                          key={rec.id}
+                          rec={rec}
+                          onView={() => setViewingRecording(rec)}
+                          onDownload={() => downloadCsv(rec)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 {sessions.map((session, si) => (
                   <div key={si} className="mb-5">
                     <div className="flex items-center justify-between mb-2.5">
@@ -470,21 +614,127 @@ export const Profile = (): JSX.Element => {
         {/* Bottom nav */}
         <div className="shrink-0" style={{ background: "white", borderTop: "1px solid #EDF0F5", boxShadow: "0 -2px 12px rgba(0,0,0,0.04)" }}>
           <div className="flex justify-around items-center py-3 px-6">
-            <button className="flex flex-col items-center gap-1 px-4 py-1" onClick={() => navigate('/devices')}>
+            <button className="flex flex-col items-center gap-1 px-3 py-1" onClick={() => navigate('/devices')}>
               <Wifi className="w-5 h-5" style={{ color: "#C0C7D4" }} />
               <span className="text-xs" style={{ color: "#C0C7D4" }}>Devices</span>
             </button>
-            <button className="flex flex-col items-center gap-1 px-4 py-1">
+            <button className="flex flex-col items-center gap-1 px-3 py-1">
               <Home className="w-5 h-5" style={{ color: "#0077A8" }} />
               <span className="text-xs font-bold" style={{ color: "#0077A8" }}>Home</span>
             </button>
-            <button className="flex flex-col items-center gap-1 px-4 py-1" onClick={() => navigate('/workout-records')}>
+            <button className="flex flex-col items-center gap-1 px-3 py-1" onClick={() => navigate('/recordings')}>
+              <ListVideo className="w-5 h-5" style={{ color: "#C0C7D4" }} />
+              <span className="text-xs" style={{ color: "#C0C7D4" }}>Recordings</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 px-3 py-1" onClick={() => navigate('/workout-records')}>
               <NotebookPen className="w-5 h-5" style={{ color: "#C0C7D4" }} />
               <span className="text-xs" style={{ color: "#C0C7D4" }}>Records</span>
             </button>
           </div>
         </div>
+
+        {/* Recording graph modal */}
+        <AnimatePresence>
+          {viewingRecording && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-30 flex flex-col"
+              style={{ background: "rgba(15,25,40,0.6)", backdropFilter: "blur(6px)" }}
+            >
+              <motion.div
+                initial={{ y: 60, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 60, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="mt-auto rounded-t-3xl overflow-hidden"
+                style={{ background: "white" }}
+              >
+                <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid #EDF0F5" }}>
+                  <div>
+                    <p className="font-black text-base" style={{ color: "#1A1A2E" }}>{viewingRecording.name}</p>
+                    <p className="text-xs" style={{ color: "#9BA3B2" }}>{viewingRecording.timestamp} · {viewingRecording.data.length} samples</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => downloadCsv(viewingRecording)}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: "#E8F7FB" }}
+                    >
+                      <Download className="w-4 h-4" style={{ color: "#0077A8" }} />
+                    </button>
+                    <button
+                      onClick={() => setViewingRecording(null)}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: "#F0F4F8" }}
+                    >
+                      <X className="w-4 h-4" style={{ color: "#9BA3B2" }} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-5 py-4">
+                  <RecordingGraph data={viewingRecording.data} />
+
+                  <div className="flex justify-around mt-3 pt-3" style={{ borderTop: "1px solid #F0F4F8" }}>
+                    {(["x", "y", "z"] as (keyof DataPoint)[]).map((axis, i) => {
+                      const vals = viewingRecording.data.map(d => d[axis] as number);
+                      const min = Math.min(...vals).toFixed(2);
+                      const max = Math.max(...vals).toFixed(2);
+                      const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+                      const colors = ["#00B4D8", "#06D6A0", "#F77F00"];
+                      return (
+                        <div key={axis} className="text-center">
+                          <p className="text-xs font-bold uppercase mb-1" style={{ color: colors[i] }}>{axis}-Axis</p>
+                          <p className="text-xs" style={{ color: "#9BA3B2" }}>Min <span className="font-bold" style={{ color: "#1A1A2E" }}>{min}</span></p>
+                          <p className="text-xs" style={{ color: "#9BA3B2" }}>Max <span className="font-bold" style={{ color: "#1A1A2E" }}>{max}</span></p>
+                          <p className="text-xs" style={{ color: "#9BA3B2" }}>Avg <span className="font-bold" style={{ color: "#1A1A2E" }}>{avg}</span></p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
+
+// ─── Recording row sub-component ─────────────────────────────────────────────
+
+function RecordingRow({ rec, onView, onDownload }: { rec: Recording; onView: () => void; onDownload: () => void }) {
+  return (
+    <div
+      className="rounded-xl px-4 py-3 flex items-center gap-3"
+      style={{ background: "white", boxShadow: "0 1px 8px rgba(0,0,0,0.05)", border: "1px solid #EDF0F5" }}
+    >
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#FFF0EE" }}>
+        <Circle className="w-3.5 h-3.5 fill-red-400 text-red-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm truncate" style={{ color: "#1A1A2E" }}>{rec.name}</p>
+        <p className="text-xs" style={{ color: "#9BA3B2" }}>{rec.timestamp} · {rec.data.length} pts</p>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={onView}
+          className="w-8 h-8 rounded-lg flex items-center justify-center"
+          style={{ background: "#E8F7FB" }}
+        >
+          <BarChart2 className="w-4 h-4" style={{ color: "#0077A8" }} />
+        </button>
+        <button
+          onClick={onDownload}
+          className="w-8 h-8 rounded-lg flex items-center justify-center"
+          style={{ background: "#F0F4F8" }}
+        >
+          <Download className="w-4 h-4" style={{ color: "#9BA3B2" }} />
+        </button>
+      </div>
+    </div>
+  );
+}

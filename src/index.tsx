@@ -5,6 +5,7 @@ import { Profile } from "./screens/Profile";
 import { Devices } from "./screens/Devices";
 import { WorkoutRecords } from "./screens/WorkoutRecords";
 import { AddExerciseType } from "./screens/AddExerciseType";
+import { Recordings } from "./screens/Recordings";
 import { DeviceProvider } from "./lib/DeviceContext";
 
 createRoot(document.getElementById("app") as HTMLElement).render(
@@ -17,6 +18,7 @@ createRoot(document.getElementById("app") as HTMLElement).render(
           <Route path="/devices" element={<Devices />} />
           <Route path="/workout-records" element={<WorkoutRecords />} />
           <Route path="/add-exercise" element={<AddExerciseType />} />
+          <Route path="/recordings" element={<Recordings />} />
         </Routes>
       </BrowserRouter>
     </DeviceProvider>
