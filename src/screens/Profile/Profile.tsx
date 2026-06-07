@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo } from 'lucide-react';
+import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo, Check } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { BleClient } from "@capacitor-community/bluetooth-le";
 import { useDevices } from "../../lib/DeviceContext";
 import { loadRecordings, saveRecording } from "../../lib/recordingsStore";
 import { saveCsv } from "../../lib/utils";
+import { DownloadToast } from "../../components/ui/DownloadToast";
 import type { DataPoint, Recording } from "../../lib/types";
 
 const SERVICE_UUID = "0000181a-0000-1000-8000-00805f9b34fb";
@@ -126,7 +127,7 @@ function downloadCsv(recording: Recording) {
     .map((d, i) => `${i * 50},${d.x},${d.y},${d.z}`)
     .join("\n");
   const filename = `${recording.name.replace(/\s+/g, "_")}.csv`;
-  saveCsv(filename, header + rows);
+  return saveCsv(filename, header + rows);
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -144,9 +145,33 @@ export const Profile = (): JSX.Element => {
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
   const recordingBuffer = useRef<DataPoint[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [doneId, setDoneId] = useState<string | null>(null);
   const [recordings, setRecordings] = useState<Recording[]>(() => loadRecordings());
   const [recordingsLoading] = useState(false);
   const [viewingRecording, setViewingRecording] = useState<Recording | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (path: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(path);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleDownload = async (rec: Recording) => {
+    if (downloadingId) return;
+    setDownloadingId(rec.id);
+    try {
+      const path = await downloadCsv(rec);
+      setDownloadingId(null);
+      setDoneId(rec.id);
+      showToast(path);
+      setTimeout(() => setDoneId(null), 1800);
+    } catch {
+      setDownloadingId(null);
+    }
+  };
 
   const stopWorkout = useCallback(async () => {
     setIsWorkoutActive(false);
@@ -383,7 +408,8 @@ export const Profile = (): JSX.Element => {
 
   return (
     <div className="flex justify-center w-full" style={{ background: "#F0F4F8" }}>
-      <div className="w-[390px] h-[100vh] relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
+      <div className="w-[390px] h-[100vh] relative flex flex-col" style={{ background: "#F0F4F8" }}>
+      <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
 
         {/* Hero header */}
         <div className="shrink-0 px-6 pt-12 pb-6" style={{ background: "linear-gradient(135deg, #0077A8 0%, #00B4D8 100%)" }}>
@@ -523,7 +549,9 @@ export const Profile = (): JSX.Element => {
                           key={rec.id}
                           rec={rec}
                           onView={() => setViewingRecording(rec)}
-                          onDownload={() => downloadCsv(rec)}
+                          onDownload={() => handleDownload(rec)}
+                          isDownloading={downloadingId === rec.id}
+                          isDone={doneId === rec.id}
                         />
                       ))}
                     </div>
@@ -560,7 +588,9 @@ export const Profile = (): JSX.Element => {
                           key={rec.id}
                           rec={rec}
                           onView={() => setViewingRecording(rec)}
-                          onDownload={() => downloadCsv(rec)}
+                          onDownload={() => handleDownload(rec)}
+                          isDownloading={downloadingId === rec.id}
+                          isDone={doneId === rec.id}
                         />
                       ))}
                     </div>
@@ -658,8 +688,8 @@ export const Profile = (): JSX.Element => {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => downloadCsv(viewingRecording)}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      onClick={() => downloadCsv(viewingRecording).then(showToast).catch(() => {})}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition-transform"
                       style={{ background: "#E8F7FB" }}
                     >
                       <Download className="w-4 h-4" style={{ color: "#0077A8" }} />
@@ -700,13 +730,22 @@ export const Profile = (): JSX.Element => {
           )}
         </AnimatePresence>
       </div>
+
+        <DownloadToast message={toast} onDismiss={() => setToast(null)} />
+      </div>
     </div>
   );
 };
 
 // ─── Recording row sub-component ─────────────────────────────────────────────
 
-function RecordingRow({ rec, onView, onDownload }: { rec: Recording; onView: () => void; onDownload: () => void }) {
+function RecordingRow({ rec, onView, onDownload, isDownloading, isDone }: {
+  rec: Recording;
+  onView: () => void;
+  onDownload: () => void;
+  isDownloading?: boolean;
+  isDone?: boolean;
+}) {
   return (
     <div
       className="rounded-xl px-4 py-3 flex items-center gap-3"
@@ -727,13 +766,22 @@ function RecordingRow({ rec, onView, onDownload }: { rec: Recording; onView: () 
         >
           <BarChart2 className="w-4 h-4" style={{ color: "#0077A8" }} />
         </button>
-        <button
+        <motion.button
           onClick={onDownload}
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ background: "#F0F4F8" }}
+          disabled={isDownloading}
+          whileTap={{ scale: 0.82 }}
+          animate={isDone ? { background: "#DCFDF3" } : { background: "#F0F4F8" }}
+          transition={{ duration: 0.15 }}
+          className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-60"
         >
-          <Download className="w-4 h-4" style={{ color: "#9BA3B2" }} />
-        </button>
+          {isDownloading ? (
+            <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(0,119,168,0.2)", borderTopColor: "#0077A8" }} />
+          ) : isDone ? (
+            <Check className="w-4 h-4" style={{ color: "#06D6A0" }} />
+          ) : (
+            <Download className="w-4 h-4" style={{ color: "#9BA3B2" }} />
+          )}
+        </motion.button>
       </div>
     </div>
   );

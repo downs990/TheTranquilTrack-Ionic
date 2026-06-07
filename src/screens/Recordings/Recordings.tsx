@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Circle, Download, ChartBar as BarChart2, X, Trash2, Search } from "lucide-react";
+import { ArrowLeft, Circle, Download, ChartBar as BarChart2, X, Trash2, Search, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { loadRecordings, deleteRecording } from "../../lib/recordingsStore";
 import { saveCsv } from "../../lib/utils";
+import { DownloadToast } from "../../components/ui/DownloadToast";
 import type { DataPoint, Recording } from "../../lib/types";
 
 function drawGraph(ctx: CanvasRenderingContext2D, W: number, H: number, data: DataPoint[]) {
@@ -77,7 +78,7 @@ function downloadCsv(rec: Recording) {
   const header = "timestamp_ms,x,y,z\n";
   const rows = rec.data.map((d, i) => `${i * 50},${d.x},${d.y},${d.z}`).join("\n");
   const filename = `${rec.name.replace(/\s+/g, "_")}.csv`;
-  saveCsv(filename, header + rows);
+  return saveCsv(filename, header + rows);
 }
 
 export const Recordings = (): JSX.Element => {
@@ -85,6 +86,30 @@ export const Recordings = (): JSX.Element => {
   const [recordings, setRecordings] = useState<Recording[]>(() => loadRecordings());
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<Recording | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [doneId, setDoneId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (path: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(path);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleDownload = async (rec: Recording) => {
+    if (downloadingId) return;
+    setDownloadingId(rec.id);
+    try {
+      const path = await downloadCsv(rec);
+      setDownloadingId(null);
+      setDoneId(rec.id);
+      showToast(path);
+      setTimeout(() => setDoneId(null), 1800);
+    } catch {
+      setDownloadingId(null);
+    }
+  };
 
   const handleDelete = (id: string) => {
     deleteRecording(id);
@@ -99,7 +124,8 @@ export const Recordings = (): JSX.Element => {
 
   return (
     <div className="flex justify-center w-full" style={{ background: "#F0F4F8" }}>
-      <div className="w-[390px] h-[100vh] relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
+      <div className="w-[390px] h-[100vh] relative flex flex-col" style={{ background: "#F0F4F8" }}>
+      <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
 
         {/* Header */}
         <div className="shrink-0 px-5 pt-12 pb-5" style={{ background: "linear-gradient(135deg, #0077A8 0%, #00B4D8 100%)" }}>
@@ -184,13 +210,24 @@ export const Recordings = (): JSX.Element => {
                         >
                           <BarChart2 className="w-4 h-4" style={{ color: "#0077A8" }} />
                         </button>
-                        <button
-                          onClick={() => downloadCsv(rec)}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ background: "#F0F4F8" }}
+                        <motion.button
+                          onClick={() => handleDownload(rec)}
+                          disabled={!!downloadingId}
+                          whileTap={{ scale: 0.82 }}
+                          animate={doneId === rec.id
+                            ? { background: "#DCFDF3", scale: 1 }
+                            : { background: "#F0F4F8", scale: 1 }}
+                          transition={{ duration: 0.15 }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-60"
                         >
-                          <Download className="w-4 h-4" style={{ color: "#9BA3B2" }} />
-                        </button>
+                          {downloadingId === rec.id ? (
+                            <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(0,119,168,0.2)", borderTopColor: "#0077A8" }} />
+                          ) : doneId === rec.id ? (
+                            <Check className="w-4 h-4" style={{ color: "#06D6A0" }} />
+                          ) : (
+                            <Download className="w-4 h-4" style={{ color: "#9BA3B2" }} />
+                          )}
+                        </motion.button>
                         <button
                           onClick={() => handleDelete(rec.id)}
                           className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -208,8 +245,7 @@ export const Recordings = (): JSX.Element => {
         </div>
 
         {/* Graph modal */}
-        <AnimatePresence>
-          {viewing && (
+        <AnimatePresence>          {viewing && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -232,8 +268,8 @@ export const Recordings = (): JSX.Element => {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => downloadCsv(viewing)}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      onClick={() => downloadCsv(viewing).then(showToast).catch(() => {})}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition-transform"
                       style={{ background: "#E8F7FB" }}
                     >
                       <Download className="w-4 h-4" style={{ color: "#0077A8" }} />
@@ -274,6 +310,9 @@ export const Recordings = (): JSX.Element => {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+        <DownloadToast message={toast} onDismiss={() => setToast(null)} />
       </div>
     </div>
   );
