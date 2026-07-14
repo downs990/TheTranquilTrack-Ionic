@@ -128,7 +128,7 @@ export const Recordings = (): JSX.Element => {
       <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
 
         {/* Header */}
-        <div className="shrink-0 px-5 pt-12 pb-5" style={{ background: "linear-gradient(135deg, #0077A8 0%, #00B4D8 100%)" }}>
+        <div className="shrink-0 px-5 pt-12 pb-5" style={{ background: "linear-gradient(135deg, #0077A8 0%, #0077A8 100%)" }}>
           <div className="flex items-center gap-3">
             <button
               className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95"

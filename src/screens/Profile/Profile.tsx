@@ -412,7 +412,7 @@ export const Profile = (): JSX.Element => {
       <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
 
         {/* Hero header */}
-        <div className="shrink-0 px-6 pt-12 pb-6" style={{ background: "linear-gradient(135deg, #0077A8 0%, #00B4D8 100%)" }}>
+        <div className="shrink-0 px-6 pt-12 pb-6" style={{ background: "linear-gradient(135deg, #0077A8 0%, #0077A8 100%)" }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-white/70 uppercase tracking-widest">Welcome back</p>
@@ -567,7 +567,7 @@ export const Profile = (): JSX.Element => {
                 transition={{ duration: 0.22 }}
               >
                 {/* Past recordings section (visible in idle state) */}
-                {recordingsLoading ? (
+                {/* {recordingsLoading ? (
                   <div className="mb-5">
                     <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: "#9BA3B2" }}>Recordings</p>
                     <div className="space-y-2">
@@ -595,7 +595,7 @@ export const Profile = (): JSX.Element => {
                       ))}
                     </div>
                   </div>
-                ) : null}
+                ) : null} */}
 
                 {sessions.map((session, si) => (
                   <div key={si} className="mb-5">
@@ -626,7 +626,7 @@ export const Profile = (): JSX.Element => {
                           <div className="grid grid-cols-3 gap-2">
                             {item.stats.map((stat, j) => (
                               <div key={j} className="rounded-xl py-2 px-2 text-center" style={{ background: "#F0F4F8" }}>
-                                <p className="font-black text-sm leading-tight" style={{ color: "#1A1A2E" }}>{stat.value}</p>
+                                <p className="font-black text-sm leading-tight" style={{ color: "#9BA3B2" }}>{stat.value}</p>
                                 <p className="text-xs leading-tight mt-0.5" style={{ color: "#9BA3B2" }}>{stat.label}</p>
                               </div>
                             ))}
