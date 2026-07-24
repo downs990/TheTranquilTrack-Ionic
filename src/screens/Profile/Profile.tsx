@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo, Check } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast, ToastContainer } from "react-toastify";
+// import { toast, ToastContainer } from "react-toastify";
 
 import { BleClient } from "@capacitor-community/bluetooth-le";
 import { useDevices } from "../../lib/DeviceContext";
@@ -453,7 +453,7 @@ export const Profile = (): JSX.Element => {
         <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
  
 
-        <ToastContainer />
+        {/* <ToastContainer /> */}
 
         
 
