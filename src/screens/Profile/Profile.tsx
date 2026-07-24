@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo, Check } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-// import { toast, ToastContainer } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import { BleClient } from "@capacitor-community/bluetooth-le";
 import { useDevices } from "../../lib/DeviceContext";
@@ -155,6 +156,7 @@ export const Profile = (): JSX.Element => {
   const [viewingRecording, setViewingRecording] = useState<Recording | null>(null);
   // const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataAnalysisRef = useRef<DataAnalysis | null>(null);
 
   const showToast = (myPath: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -217,6 +219,13 @@ export const Profile = (): JSX.Element => {
       connectedDeviceId.current = device.deviceId;
       setBleStatus("connected");
 
+      const dataAnalysis = new DataAnalysis(300);
+      dataAnalysisRef.current = dataAnalysis;
+      await dataAnalysis.ready;
+      const paths = dataAnalysis.getAllPathsString().trim(); // TODO: Delete this var
+ 
+
+
       await BleClient.startNotifications(
         device.deviceId,
         SERVICE_UUID,
@@ -233,40 +242,23 @@ export const Profile = (): JSX.Element => {
           const point: DataPoint = { x, y, z };
 
 
-          // ------------------------------------------------------------
-          // Next Steps: 
-          // 1. Remove fs and path imports from DataAnalysis.ts with Browser specific APIs
-          // 2. Test by print to make sure that .getDatasets() construct the correct paths for .csv files 
-          // 3. Un comment the code below here to try live processing with DataAnalysis() object. 
-          // ------------------------------------------------------------
+          const da = dataAnalysisRef.current;
+          if (da) {
+            da.addToBuffer(x, y, z);
+            const detectedExercises = da.detectExerciseType();
+            console.log("E_TYPES: " + JSON.stringify(detectedExercises));
 
-
-
-
-          // const dataAnalysis = new DataAnalysis(300); 
-          // toast.success( "Exercise Type: " + dataAnalysis.getAllPathsString());
-          
-          // dataAnalysis.addToBuffer(x, y, z);
-          // var detectedExercises = dataAnalysis.detectExerciseType();
-
-          // console.log("E_TYPES: " + JSON.stringify(detectedExercises));
-
-
-          // if (detectedExercises.length > 0) {
-
-          //   // PRINT TOAST MESSAGE TO SCREEN OF EXERCISE TYPE
-          //   //           rep_info = f"{rep['exercise']} (confidence: {rep['confidence']:.1f}%, dtw: {rep.get('raw_dtw_score', 0):.1f})"
-          //   //           print(f"Row {row_index}: Detected {rep_info}")
-            
-          //   toast.success( "Exercise Type: " + detectedExercises);
-             
-          // }
-
-
-
-        // ------------------------------------------------------------
-
-
+            if (detectedExercises.length > 0) {
+              for (const rep of detectedExercises) {
+                const confidence = rep.confidence !== undefined ? rep.confidence.toFixed(1) : "?";
+                toast.success(`Exercise Type: ${rep.exercise} (${confidence}% confidence)`, {
+                  position: "bottom-center",
+                  autoClose: 3000,
+                  theme: "dark",
+                });
+              }
+            }
+          }
 
           if (isRecordingRef.current) {
             recordingBuffer.current.push(point);
@@ -451,11 +443,22 @@ export const Profile = (): JSX.Element => {
     <div className="flex justify-center w-full" style={{ background: "#F0F4F8" }}>
       <div className="w-[390px] h-[100vh] relative flex flex-col" style={{ background: "#F0F4F8" }}>
         <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ background: "#F0F4F8" }}>
- 
 
-        {/* <ToastContainer /> */}
 
-        
+          <ToastContainer
+            position="bottom-center"
+            autoClose={8000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            pauseOnFocusLoss
+            draggable={false}
+            pauseOnHover
+            theme="dark"
+            style={{ maxWidth: "358px", marginLeft: "auto", marginRight: "auto" }}
+          />
+
+
 
           {/* Hero header */}
           <div className="shrink-0 px-6 pt-12 pb-6" style={{ background: "linear-gradient(135deg, #0077A8 0%, #0077A8 100%)" }}>
@@ -789,7 +792,7 @@ export const Profile = (): JSX.Element => {
             )}
           </AnimatePresence>
         </div>
- 
+
       </div>
     </div>
   );

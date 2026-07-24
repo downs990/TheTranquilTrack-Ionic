@@ -1,9 +1,7 @@
-/// <reference types="node" />
-import * as fs from 'fs';
-import * as path from 'path';
+// Browser-based dataset loader. CSV templates live under `public/Test Data/...`
+// and are fetched at runtime. The browser has no directory-listing API for
+// static assets, so the example file list is declared explicitly below.
 
-
-// Define explicit interfaces for type safety
 interface SignalSegment {
     x: number[];
     y: number[];
@@ -23,13 +21,53 @@ type ExampleTuple = [string, SignalSegment];
 type PendingStartTuple = [number, string, number]; // [abs_start, exercise_type, distance]
 type BoundaryTuple = [number, number, string, string, number]; // [start_abs, end_abs, start_ex, end_ex, distance]
 
+// Relative URL prefix for Vite's public dir. Respects the configured `base`.
+const PUBLIC_BASE = import.meta.env.BASE_URL;
+const DATASET_ROOT = `${PUBLIC_BASE}Test Data/Seeed Xiao nrf52840 Sense`;
 
+// Known example_*.csv files per exercise folder (sourced from the Test Data dir).
+// Adding a new template file means adding its filename here.
+const DATASET_MANIFEST: Record<string, string[]> = {
+    "Bench Normal": [
+        "example_exercise_1_bench_press_75lbs.csv",
+        "example_exercise_2_bench_press_75lbs.csv",
+    ],
+    "Calf Raises": [
+        "example_001_calf_raises_right_ankle.csv",
+        "example_002_calf_raises_right_ankle.csv",
+        "example_003_calf_raises_right_ankle.csv",
+        "example_004_calf_raises_right_ankle.csv",
+        "example_005_calf_raises_right_ankle.csv",
+    ],
+    "Dumbbell Curl": [
+        "example_exercise_1_dumbbell_curl_25lbs.csv",
+        "example_exercise_2_dumbbell_curl_25lbs.csv",
+    ],
+    "Squats": [
+        "example_001_right_ankle_squat.csv",
+        "example_002_right_ankle_squat.csv",
+        "example_003_right_ankle_squat.csv",
+        "example_004_right_ankle_squat.csv",
+        "example_005_right_ankle_squat.csv",
+    ],
+    "Walking": [
+        "example_001_walking_right_step.csv",
+        "example_002_walking_right_step.csv",
+        "example_003_walking_right_step.csv",
+        "example_004_walking_right_step.csv",
+        "example_005_walking_right_step.csv",
+    ],
+    "Push Ups": [
+        "example_exercise_1_pushups.csv",
+        "example_exercise_2_pushups.csv",
+    ],
+};
 
 export class DataAnalysis {
     private exerciseTypeDirectories: string[];
     private bufferSize: number;
     private repExamples: SignalSegment[][];
-    
+
     private startTemplates: TemplateTuple[] = [];
     private endTemplates: TemplateTuple[] = [];
     private templateChunkSize: number = 12;
@@ -53,34 +91,53 @@ export class DataAnalysis {
 
     private allPathsString: string = "";
 
+    // Resolves once template CSVs have been fetched and parsed. Await this
+    // before relying on repExamples / detection results.
+    public ready: Promise<void>;
+
     constructor(bufferSize: number) {
-        this.exerciseTypeDirectories = [    
-            
-            "/Bench Normal",
-            "/Calf Raises",
-            "/Dumbbell Curl",
-            "/Squats",
-            "/Walking",
-            "/Push Ups" 
-            
+        this.exerciseTypeDirectories = [
+            "Bench Normal",
+            "Calf Raises",
+            "Dumbbell Curl",
+            "Squats",
+            "Walking",
+            "Push Ups",
         ];
 
         this.bufferSize = bufferSize;
-        this.repExamples = this.getDatasets();
+        this.repExamples = [];
 
-        
+        this.ready = this._loadDatasets();
 
-        // this._extractTemplates();
 
-        // // Build example reference for sliding window matching
-        // this.repExamples.forEach((exerciseTypeList, i) => {
-        //     const exerciseType = this.exerciseTypeDirectories[i];
-        //     exerciseTypeList.forEach((example) => {
-        //         this.allExamples.push([exerciseType, example]);
-        //     });
-        // });
 
-        // this._calculateMinLength();
+
+
+
+
+    }
+
+    private async _loadDatasets(): Promise<void> {
+        try {
+            this.repExamples = await this.getDatasets();
+
+
+            // Build example reference for sliding window matching
+            this._extractTemplates();
+            this.repExamples.forEach((exerciseTypeList, i) => {
+                const exerciseType = this.exerciseTypeDirectories[i];
+                exerciseTypeList.forEach((example) => {
+                    this.allExamples.push([exerciseType, example]);
+                });
+            });
+            this._calculateMinLength();
+            
+
+        } catch (err) {
+            console.error("Failed to load datasets:", err);
+            this.repExamples = [];
+        }
     }
 
     /**
@@ -88,8 +145,8 @@ export class DataAnalysis {
      */
     private euclidean(p1: number[], p2: number[]): number {
         return Math.sqrt(
-            Math.pow(p1[0] - p2[0], 2) + 
-            Math.pow(p1[1] - p2[1], 2) + 
+            Math.pow(p1[0] - p2[0], 2) +
+            Math.pow(p1[1] - p2[1], 2) +
             Math.pow(p1[2] - p2[2], 2)
         );
     }
@@ -100,9 +157,9 @@ export class DataAnalysis {
     public dtwDistance(signal1: SignalSegment, signal2: SignalSegment): number {
         const n = signal1.x.length;
         const m = signal2.x.length;
-        
+
         // Initialize an (n + 1) x (m + 1) matrix with Infinity
-        const dtwMatrix: number[][] = Array.from({ length: n + 1 }, () => 
+        const dtwMatrix: number[][] = Array.from({ length: n + 1 }, () =>
             Array(m + 1).fill(Infinity)
         );
         dtwMatrix[0][0] = 0;
@@ -125,35 +182,38 @@ export class DataAnalysis {
     }
 
     /**
-     * Synchronous file parsing mimicking the csv.DictReader behavior
+     * Fetches each CSV URL over HTTP and parses it into x/y/z arrays.
      */
-    public getDataFromFiles(listOfFileNames: string[]): SignalSegment[] {
+    public async getDataFromFiles(listOfUrls: string[]): Promise<SignalSegment[]> {
         const allDictionaries: SignalSegment[] = [];
 
-        for (const fileName of listOfFileNames) {
+        for (const url of listOfUrls) {
             const x: number[] = [];
             const y: number[] = [];
             const z: number[] = [];
 
             try {
-                const fileContent = fs.readFileSync(fileName, { encoding: 'utf-8' });
+                const res = await fetch(url);
+                if (!res.ok) {
+                    console.error(`HTTP ${res.status} fetching ${url}`);
+                    continue;
+                }
+                const fileContent = await res.text();
                 const lines = fileContent.split(/\r?\n/);
                 if (lines.length === 0) continue;
 
                 // Extract headers and clean up any potential spaces/quotes
                 const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
-                
+
                 const indexX = headers.indexOf('x');
-                // Target variations matching Python's space-prepended indices: " y", " z"
-                const indexY = headers.findIndex(h => h === 'y' || h === 'y'); 
+                const indexY = headers.findIndex(h => h === 'y' || h === 'y');
                 const indexZ = headers.findIndex(h => h === 'z' || h === 'z');
 
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
-                    
+
                     const row = line.split(',');
-                    // Fallbacks handle trimming variants safely
                     const rawX = row[indexX];
                     const rawY = row[indexY] || row[headers.indexOf('y')];
                     const rawZ = row[indexZ] || row[headers.indexOf('z')];
@@ -167,7 +227,7 @@ export class DataAnalysis {
 
                 allDictionaries.push({ x, y, z });
             } catch (err) {
-                console.error(`Error reading file ${fileName}:`, err);
+                console.error(`Error reading ${url}:`, err);
             }
         }
 
@@ -179,31 +239,19 @@ export class DataAnalysis {
     }
 
     /**
-     * Leverages native Node filesystem logic instead of Python's glob
+     * Fetches the example CSVs declared in DATASET_MANIFEST and parses them
+     * into per-exercise signal segments.
      */
-    public getDatasets(): SignalSegment[][] {
-        const rootDir = "../../Test Data/Seeed Xiao nrf52840 Sense"; // TODO: Test This 
+    public async getDatasets(): Promise<SignalSegment[][]> {
         const examples: SignalSegment[][] = [];
 
         for (const folder of this.exerciseTypeDirectories) {
-            const fullPath = path.join(rootDir, folder);
+            const files = DATASET_MANIFEST[folder] ?? [];
+            const urls = files.map(file => encodeURI(`${DATASET_ROOT}/${folder}/${file}`));
 
-            this.allPathsString += fullPath + "\n"; 
+            this.allPathsString += urls.join("\n") + "\n";
 
-            let csvFiles: string[] = [];
-
-            try {
-                if (fs.existsSync(fullPath)) {
-                    // Mimic glob pattern: example_*.csv
-                    csvFiles = fs.readdirSync(fullPath)
-                        .filter(file => file.startsWith('example_') && file.endsWith('.csv'))
-                        .map(file => path.join(fullPath, file));
-                }
-            } catch (err) {
-                console.error(`Error processing directory ${fullPath}:`, err);
-            }
-
-            const currentExerciseTypeList = this.getDataFromFiles(csvFiles);
+            const currentExerciseTypeList = await this.getDataFromFiles(urls);
             examples.push(currentExerciseTypeList);
         }
 
@@ -229,7 +277,7 @@ export class DataAnalysis {
 
         this.repExamples.forEach((exerciseTypeList, i) => {
             const exerciseType = this.exerciseTypeDirectories[i];
-            
+
             for (const example of exerciseTypeList) {
                 const sigLen = example.x.length;
                 if (sigLen < this.templateChunkSize * 2) {
@@ -435,10 +483,4 @@ export class DataAnalysis {
 
         return detectedExercises;
     }
-}
-
-// Example Usage
-if (require.main === module) {
-    const bufferSize = 1;
-    const analyzer = new DataAnalysis(bufferSize);
 }
