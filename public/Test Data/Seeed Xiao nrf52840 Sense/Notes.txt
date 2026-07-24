@@ -1,0 +1,58 @@
+Each of these start out in their resting positions. 
+	This means that the first few values of each recording is what 
+	the rest range for that exercise looks like. 
+
+All data collected in this folder was done using the right 
+	ankle and wrist sensors. 
+
+
+Seated leg press 
+	5 reps 70lbs (~3seconds for full rep start to finish, 
+	meaning from fully extended leg position then down and
+	 back to fully extended leg position position)
+
+Leg extensions 
+	5 reps 10lbs (~2.5 seconds for full rep, meaning from 	
+	unextended legs to fully extended legs and back down to unextended legs)
+ 
+Seated leg extensions 
+	5reps 25lbs (~3.5 seconds for full rep) 
+
+
+Weight calf raises (considered as normal calf raises)
+
+
+Squats (already captured)
+
+
+Resting state for dips is full extended arms..
+ 
+Chest fly machine #4 holes
+- chest fly machine individual rep recordings have a spike because i started 
+	the rep less smoothly and also allowed my hands/knuckles to touch in 
+	the middle of each rep
+ 
+Chest fly machine 3reps 40lbs recording has the spikes also. Allow the weight
+	to fall completely when you retract back to resting position and allow 
+	your knuckles to touch. 
+
+Seated chest press #1 holes
+ 
+Sit-ups - right arm crossed on chest with left arm crossed over right on chest
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
