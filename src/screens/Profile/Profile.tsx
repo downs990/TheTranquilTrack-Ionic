@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo, Check } from 'lucide-react';
+import { Dumbbell, Wifi, Chrome as Home, NotebookPen, UserPen, ChartNoAxesColumnIncreasing, PersonStanding, Plus, Play, Square, Bluetooth, CircleAlert as AlertCircle, Circle, Download, ChartBar as BarChart2, X, ListVideo, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast, ToastContainer } from "react-toastify";
@@ -154,6 +154,8 @@ export const Profile = (): JSX.Element => {
   const [recordings, setRecordings] = useState<Recording[]>(() => loadRecordings());
   const [recordingsLoading] = useState(false);
   const [viewingRecording, setViewingRecording] = useState<Recording | null>(null);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState("2025-03-15");
+  const [calendarMonth, setCalendarMonth] = useState(new Date(2025, 2, 1));
   // const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dataAnalysisRef = useRef<DataAnalysis | null>(null);
@@ -659,45 +661,130 @@ export const Profile = (): JSX.Element => {
                   </div>
                 ) : null} */}
 
-                  {sessions.map((session, si) => (
-                    <div key={si} className="mb-5">
-                      <div className="flex items-center justify-between mb-2.5">
-                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#9BA3B2" }}>{session.label}</p>
-                        <p className="text-xs font-bold" style={{ color: "#00B4D8" }}>{session.date}</p>
-                      </div>
-                      <div className="space-y-3">
-                        {session.exercises.map((item, i) => (
-                          <div
-                            key={i}
-                            className="rounded-2xl px-4 py-3.5"
-                            style={{ background: "white", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}
-                          >
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: item.bg }}>
-                                {item.icon}
-                              </div>
-                              <div className="flex-1">
-                                <p className="font-black text-sm leading-tight" style={{ color: "#5b5580" }}>{item.label}</p>
-                                <p className="text-xs" style={{ color: "#9BA3B2" }}>{item.type}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-black text-base leading-tight" style={{ color: "#e0e0e0" }}>{item.primary}</p>
-                                <p className="text-xs" style={{ color: "#9BA3B2" }}>{item.primaryLabel}</p>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              {item.stats.map((stat, j) => (
-                                <div key={j} className="rounded-xl py-2 px-2 text-center" style={{ background: "#F0F4F8" }}>
-                                  <p className="font-black text-sm leading-tight" style={{ color: "#9BA3B2" }}>{stat.value}</p>
-                                  <p className="text-xs leading-tight mt-0.5" style={{ color: "#9BA3B2" }}>{stat.label}</p>
-                                </div>
-                              ))}
+                  {(() => {
+                    const toDateKey = (date: Date) => {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, "0");
+                      const day = String(date.getDate()).padStart(2, "0");
+                      return `${year}-${month}-${day}`;
+                    };
+                    const workoutByDate = new Map(
+                      sessions.map(session => [toDateKey(new Date(session.date)), session])
+                    );
+                    const firstWeekday = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay();
+                    const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+                    const selectedSession = workoutByDate.get(selectedCalendarDate);
+                    const selectedDate = new Date(`${selectedCalendarDate}T12:00:00`);
+                    const monthLabel = calendarMonth.toLocaleDateString([], { month: "long", year: "numeric" });
+
+                    return (
+                      <>
+                        <div className="rounded-2xl p-4 mb-4" style={{ background: "white", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+                          <div className="flex items-center justify-between mb-4">
+                            <p className="font-black text-base" style={{ color: "#1A1A2E" }}>{monthLabel}</p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                aria-label="Previous month"
+                                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                style={{ background: "#F0F4F8", color: "#0077A8" }}
+                              ><ChevronLeft className="w-4 h-4" /></button>
+                              <button
+                                type="button"
+                                aria-label="Next month"
+                                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                style={{ background: "#F0F4F8", color: "#0077A8" }}
+                              ><ChevronRight className="w-4 h-4" /></button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                          <div className="grid grid-cols-7 gap-1 mb-2">
+                            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                              <div key={day} className="text-center text-[10px] font-bold py-1" style={{ color: "#9BA3B2" }}>{day}</div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-7 gap-1">
+                            {Array.from({ length: firstWeekday }, (_, i) => <div key={`blank-${i}`} className="h-10" />)}
+                            {Array.from({ length: daysInMonth }, (_, i) => {
+                              const day = i + 1;
+                              const date = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day);
+                              const dateKey = toDateKey(date);
+                              const hasWorkout = workoutByDate.has(dateKey);
+                              const isSelected = selectedCalendarDate === dateKey;
+                              return (
+                                <button
+                                  key={dateKey}
+                                  type="button"
+                                  onClick={() => setSelectedCalendarDate(dateKey)}
+                                  aria-pressed={isSelected}
+                                  aria-label={`${date.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}${hasWorkout ? ", workout recorded" : ", no workout recorded"}`}
+                                  className="relative h-10 rounded-xl flex flex-col items-center justify-center text-sm font-bold transition-colors"
+                                  style={{
+                                    background: isSelected ? "#0077A8" : hasWorkout ? "#E8F7FB" : "transparent",
+                                    color: isSelected ? "white" : hasWorkout ? "#0077A8" : "#5B6472"
+                                  }}
+                                >
+                                  {day}
+                                  {hasWorkout && <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: isSelected ? "white" : "#00B4D8" }} />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center gap-2 mt-3">
+                            <span className="w-2 h-2 rounded-full" style={{ background: "#00B4D8" }} />
+                            <span className="text-xs" style={{ color: "#9BA3B2" }}>Workout recorded</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#9BA3B2" }}>
+                            {selectedDate.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                          </p>
+                          {selectedSession && <span className="text-xs font-bold" style={{ color: "#00B4D8" }}>Workout</span>}
+                        </div>
+                        {selectedSession ? (
+                          <div className="space-y-3">
+                            {selectedSession.exercises.map((item, i) => (
+                              <div
+                                key={i}
+                                className="rounded-2xl px-4 py-3.5"
+                                style={{ background: "white", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}
+                              >
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: item.bg }}>
+                                    {item.icon}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="font-black text-sm leading-tight" style={{ color: "#5b5580" }}>{item.label}</p>
+                                    <p className="text-xs" style={{ color: "#9BA3B2" }}>{item.type}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-black text-base leading-tight" style={{ color: "#1A1A2E" }}>{item.primary}</p>
+                                    <p className="text-xs" style={{ color: "#9BA3B2" }}>{item.primaryLabel}</p>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {item.stats.map((stat, j) => (
+                                    <div key={j} className="rounded-xl py-2 px-2 text-center" style={{ background: "#F0F4F8" }}>
+                                      <p className="font-black text-sm leading-tight" style={{ color: "#5B6472" }}>{stat.value}</p>
+                                      <p className="text-xs leading-tight mt-0.5" style={{ color: "#9BA3B2" }}>{stat.label}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl p-6 text-center" style={{ background: "white", border: "1px dashed #D8E0E8" }}>
+                            <Dumbbell className="w-7 h-7 mx-auto mb-2" style={{ color: "#C0C7D4" }} />
+                            <p className="font-bold text-sm" style={{ color: "#5B6472" }}>No workout recorded</p>
+                            <p className="text-xs mt-1" style={{ color: "#9BA3B2" }}>Select a highlighted date to view a workout.</p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </motion.div>
               )}
             </AnimatePresence>
