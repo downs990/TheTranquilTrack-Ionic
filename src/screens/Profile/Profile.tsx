@@ -677,11 +677,11 @@ export const Profile = (): JSX.Element => {
                                 {item.icon}
                               </div>
                               <div className="flex-1">
-                                <p className="font-black text-sm leading-tight" style={{ color: "#1A1A2E" }}>{item.label}</p>
+                                <p className="font-black text-sm leading-tight" style={{ color: "#5b5580" }}>{item.label}</p>
                                 <p className="text-xs" style={{ color: "#9BA3B2" }}>{item.type}</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-black text-base leading-tight" style={{ color: "#0077A8" }}>{item.primary}</p>
+                                <p className="font-black text-base leading-tight" style={{ color: "#e0e0e0" }}>{item.primary}</p>
                                 <p className="text-xs" style={{ color: "#9BA3B2" }}>{item.primaryLabel}</p>
                               </div>
                             </div>
